@@ -1,0 +1,55 @@
+{
+  "entities": {
+    "Portfolio": {
+      "title": "Portfolio",
+      "description": "Global portfolio stats",
+      "type": "object",
+      "properties": {
+        "portfolioValue": {
+          "type": "number",
+          "description": "Total Portfolio Value"
+        }
+      },
+      "required": ["portfolioValue"]
+    },
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Individual account in the portfolio",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "units": { "type": "number" },
+        "netDeposits": { "type": "number" },
+        "benchmarkCapital": { "type": "number" }
+      },
+      "required": ["name", "units", "netDeposits", "benchmarkCapital"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Transaction history for a user",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "amount": { "type": "number" },
+        "note": { "type": "string" },
+        "date": { "type": "string" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["type", "amount", "date", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/portfolio/global": {
+      "schema": "Portfolio",
+      "description": "Global portfolio value"
+    },
+    "/users/{userId}": {
+      "schema": "UserAccount",
+      "description": "Individual users within the family portfolio"
+    },
+    "/users/{userId}/history/{historyId}": {
+      "schema": "Transaction",
+      "description": "Transaction histories for a specific user"
+    }
+  }
+}

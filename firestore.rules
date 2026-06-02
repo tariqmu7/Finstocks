@@ -1,0 +1,85 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitive Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() { return isSignedIn() && request.auth.token.email == "tarekmoh123@gmail.com"; }
+    function isApproved() {
+      return isAdmin() || (isSignedIn() && get(/databases/$(database)/documents/userAccess/$(request.auth.uid)).data.status == 'approved');
+    }
+    
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+
+    function isValidUserAccess(data) {
+      return data.keys().hasAll(['email', 'status'])
+          && data.keys().size() == 2
+          && data.email is string
+          && data.status in ['pending', 'approved', 'denied'];
+    }
+
+    match /userAccess/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      // A user can create their own access request as pending
+      allow create: if isSignedIn() && request.auth.uid == uid && isValidId(uid) && isValidUserAccess(incoming()) && incoming().status == 'pending' && incoming().email == request.auth.token.email;
+      // Admin can update status
+      allow update: if isAdmin() && isValidUserAccess(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+    }
+
+    function isValidPortfolio(data) {
+      return data.keys().hasAll(['portfolioValue']) 
+          && data.portfolioValue is number
+          && (!data.keys().hasAny(['monthlyReturn']) || data.monthlyReturn is number)
+          && (!data.keys().hasAny(['yearlyReturn']) || data.yearlyReturn is number)
+          && (!data.keys().hasAny(['monthlyAlpha']) || data.monthlyAlpha is number)
+          && (!data.keys().hasAny(['yearlyAlpha']) || data.yearlyAlpha is number)
+          && (!data.keys().hasAny(['beta']) || data.beta is number);
+    }
+
+    function isValidUserAccount(data) {
+      return data.keys().hasAll(['name', 'units', 'netDeposits', 'benchmarkCapital'])
+          && data.keys().size() == 4
+          && data.name is string && data.name.size() <= 100
+          && data.units is number
+          && data.netDeposits is number
+          && data.benchmarkCapital is number;
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['type', 'amount', 'note', 'date', 'timestamp'])
+          && data.keys().size() == 5
+          && data.type is string && data.type.size() <= 20
+          && data.amount is number
+          && data.note is string && data.note.size() <= 200
+          && data.date is string && data.date.size() <= 20
+          && data.timestamp is number;
+    }
+
+    match /portfolio/{docId} {
+      allow read: if isApproved();
+      allow create: if isAdmin() && isValidId(docId) && isValidPortfolio(incoming());
+      allow update: if isAdmin() && isValidId(docId) && isValidPortfolio(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['portfolioValue', 'monthlyReturn', 'yearlyReturn', 'monthlyAlpha', 'yearlyAlpha', 'beta']);
+    }
+
+    match /users/{userId} {
+      allow read: if isApproved();
+      allow create: if isAdmin() && isValidId(userId) && isValidUserAccount(incoming());
+      allow update: if isAdmin() && isValidId(userId) && isValidUserAccount(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['units', 'netDeposits']);
+      
+      match /history/{historyId} {
+        allow read: if isApproved();
+        allow create: if isAdmin() 
+            && isValidId(historyId) 
+            && isValidTransaction(incoming()) 
+            && exists(/databases/$(database)/documents/users/$(userId));
+        allow update: if false; // history is immutable
+      }
+    }
+  }
+}

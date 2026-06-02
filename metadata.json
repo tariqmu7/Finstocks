@@ -1,0 +1,6 @@
+{
+  "name": "Family Portfolio",
+  "description": "Securely track family investments, capital scaling and history with a private dashboard.",
+  "requestFramePermissions": ["clipboard-write"],
+  "majorCapabilities": []
+}
